@@ -459,10 +459,19 @@ private[akka] class RemoteActorRef private[akka] (
   deploy: Option[Deploy])
   extends InternalActorRef with RemoteRef {
 
-  @volatile var cachedAssociation: artery.Association = null
+  remote match {
+    case t: ArteryTransport ⇒
+      // detect mistakes such as using "akka.tcp" with Artery
+      if (path.address.protocol != t.localAddress.address.protocol)
+        throw new IllegalArgumentException(
+          s"Wrong protocol of [${path}], expected [${t.localAddress.address.protocol}]")
+    case _ ⇒
+  }
+
+  @volatile private[remote] var cachedAssociation: artery.Association = null
 
   // used by artery to direct messages to a separate stream for large messages
-  @volatile var cachedLargeMessageDestinationFlag: LargeMessageDestinationFlag = null
+  @volatile private[remote] var cachedLargeMessageDestinationFlag: LargeMessageDestinationFlag = null
 
   def getChild(name: Iterator[String]): InternalActorRef = {
     val s = name.toStream
