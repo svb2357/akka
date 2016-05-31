@@ -73,12 +73,12 @@ trait ActorContext[T] {
    * Create an untyped child Actor from the given [[akka.actor.Props]] under a randomly chosen name.
    * It is good practice to name Actors wherever practical.
    */
-  def actorOf(props: untyped.Props): untyped.ActorRef
+  //def actorOf(props: untyped.Props): untyped.ActorRef
 
   /**
    * Create an untyped child Actor from the given [[akka.actor.Props]] and with the given name.
    */
-  def actorOf(props: untyped.Props, name: String): untyped.ActorRef
+  //def actorOf(props: untyped.Props, name: String): untyped.ActorRef
 
   /**
    * Force the child Actor under the given name to terminate after it finishes
@@ -103,7 +103,7 @@ trait ActorContext[T] {
    * [[ActorSystem]] to which the referenced Actor belongs is declared as
    * failed (e.g. in reaction to being unreachable).
    */
-  def watch(other: akka.actor.ActorRef): akka.actor.ActorRef
+  //def watch(other: akka.actor.ActorRef): akka.actor.ActorRef
 
   /**
    * Revoke the registration established by `watch`. A [[Terminated]]
@@ -115,7 +115,7 @@ trait ActorContext[T] {
    * Revoke the registration established by `watch`. A [[Terminated]]
    * notification will not subsequently be received for the referenced Actor.
    */
-  def unwatch(other: akka.actor.ActorRef): akka.actor.ActorRef
+  //def unwatch(other: akka.actor.ActorRef): akka.actor.ActorRef
 
   /**
    * Schedule the sending of a [[ReceiveTimeout]] notification in case no other
@@ -155,9 +155,9 @@ trait ActorContext[T] {
  * See [[EffectfulActorContext]] for more advanced uses.
  */
 class StubbedActorContext[T](
-  val name: String,
-  override val props: Props[T])(
-    override implicit val system: ActorSystem[Nothing]) extends ActorContext[T] {
+    val name: String,
+    override val props: Props[T])(
+        override implicit val system: ActorSystem[Nothing]) extends ActorContext[T] {
 
   val inbox = Inbox.sync[T](name)
   override val self = inbox.ref
@@ -169,7 +169,7 @@ class StubbedActorContext[T](
   override def child(name: String): Option[ActorRef[Nothing]] = _children get name map (_.ref)
   override def spawnAnonymous[U](props: Props[U]): ActorRef[U] = {
     val i = Inbox.sync[U](childName.next())
-    _children += i.ref.untypedRef.path.name -> i
+    _children += i.ref.path.name -> i
     i.ref
   }
   override def spawn[U](props: Props[U], name: String): ActorRef[U] =
@@ -180,19 +180,7 @@ class StubbedActorContext[T](
         _children += name -> i
         i.ref
     }
-  override def actorOf(props: untyped.Props): untyped.ActorRef = {
-    val i = Inbox.sync[Any](childName.next())
-    _children += i.ref.untypedRef.path.name -> i
-    i.ref.untypedRef
-  }
-  override def actorOf(props: untyped.Props, name: String): untyped.ActorRef =
-    _children get name match {
-      case Some(_) ⇒ throw new untyped.InvalidActorNameException(s"actor name $name is already taken")
-      case None ⇒
-        val i = Inbox.sync[Any](name)
-        _children += name -> i
-        i.ref.untypedRef
-    }
+
   override def stop(child: ActorRef[Nothing]): Boolean = {
     // removal is asynchronous, so don’t do it here; explicit removeInbox needed from outside
     _children.get(child.path.name) match {
@@ -216,24 +204,3 @@ class StubbedActorContext[T](
   def getInbox[U](name: String): Inbox.SyncInbox[U] = _children(name).asInstanceOf[Inbox.SyncInbox[U]]
   def removeInbox(name: String): Unit = _children -= name
 }
-
-/*
- * TODO
- * 
- * Currently running a behavior requires that the context stays the same, since
- * the behavior may well close over it and thus a change might not be effective
- * at all. Another issue is that there is genuine state within the context that
- * is coupled to the behavior’s state: if child actors were created then
- * migrating a behavior into a new context will not work.
- * 
- * This note is about remembering the reasons behind this restriction and
- * proposes an ActorContextProxy as a (broken) half-solution. Another avenue
- * by which a solution may be explored is for Pure behaviors in that they
- * may be forced to never remember anything that is immobile.
- */
-//class MobileActorContext[T](_name: String, _props: Props[T], _system: ActorSystem[Nothing])
-//  extends EffectfulActorContext[T](_name, _props, _system) {
-//
-//}
-//
-//class ActorContextProxy[T](var d: ActorContext[T]) extends ActorContext[T]

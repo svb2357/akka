@@ -16,20 +16,12 @@ import language.implicitConversions
  * [[akka.event.EventStream]] on a best effort basis
  * (i.e. this delivery is not reliable).
  */
-abstract class ActorRef[-T] extends java.lang.Comparable[ActorRef[Any]] { this: ScalaActorRef[T] ⇒
-  /**
-   * INTERNAL API.
-   *
-   * Implementation detail. The underlying untyped [[akka.actor.ActorRef]]
-   * of this typed ActorRef.
-   */
-  private[akka] def untypedRef: akka.actor.ActorRef
-
+abstract class ActorRef[-T](_path: ActorPath) extends java.lang.Comparable[ActorRef[Any]] { this: ScalaActorRef[T] ⇒
   /**
    * Send a message to the Actor referenced by this ActorRef using *at-most-once*
    * messaging semantics.
    */
-  def tell(msg: T): Unit = untypedRef ! msg
+  def tell(msg: T): Unit
 
   /**
    * Unsafe utility method for widening the type accepted by this ActorRef;
@@ -44,26 +36,45 @@ abstract class ActorRef[-T] extends java.lang.Comparable[ActorRef[Any]] { this: 
    * and more than one Actor instance can exist with the same path at different
    * points in time, but not concurrently.
    */
-  def path: ActorPath = untypedRef.path
+  final val path: ActorPath = _path
 
-  override def toString = untypedRef.toString
-  override def equals(other: Any) = other match {
-    case a: ActorRef[_] ⇒ a.untypedRef == untypedRef
-    case _              ⇒ false
+  /**
+   * Comparison takes path and the unique id of the actor cell into account.
+   */
+  final def compareTo(other: ActorRef[Any]) = {
+    val x = this.path compareTo other.path
+    if (x == 0) if (this.path.uid < other.path.uid) -1 else if (this.path.uid == other.path.uid) 0 else 1
+    else x
   }
-  override def hashCode = untypedRef.hashCode
-  override def compareTo(other: ActorRef[Any]) = untypedRef.compareTo(other.untypedRef)
+
+  final override def hashCode: Int = path.uid
+
+  /**
+   * Equals takes path and the unique id of the actor cell into account.
+   */
+  final override def equals(that: Any): Boolean = that match {
+    case other: ActorRef[_] ⇒ path.uid == other.path.uid && path == other.path
+    case _                  ⇒ false
+  }
+
+  final override def toString: String = s"Actor[${path}#${path.uid}]"
 }
 
 /**
  * This trait is used to hide the `!` method from Java code.
  */
 trait ScalaActorRef[-T] { this: ActorRef[T] ⇒
+  /**
+   * Send a message to the Actor referenced by this ActorRef using *at-most-once*
+   * messaging semantics.
+   */
   def !(msg: T): Unit = tell(msg)
 }
 
 object ActorRef {
-  private class Combined[T](val untypedRef: akka.actor.ActorRef) extends ActorRef[T] with ScalaActorRef[T]
+  private class Combined[T](val untypedRef: akka.actor.ActorRef) extends ActorRef[T](untypedRef.path) with ScalaActorRef[T] {
+    override def tell(msg: T): Unit = untypedRef.tell(msg, akka.actor.Actor.noSender)
+  }
 
   implicit def toScalaActorRef[T](ref: ActorRef[T]): ScalaActorRef[T] = ref.asInstanceOf[ScalaActorRef[T]]
 

@@ -31,7 +31,7 @@ object Effect {
  * on it and otherwise stubs them out like a [[StubbedActorContext]].
  */
 class EffectfulActorContext[T](_name: String, _props: Props[T], _system: ActorSystem[Nothing])
-  extends StubbedActorContext[T](_name, _props)(_system) {
+    extends StubbedActorContext[T](_name, _props)(_system) {
   import akka.{ actor ⇒ a }
   import Effect._
 
@@ -59,21 +59,12 @@ class EffectfulActorContext[T](_name: String, _props: Props[T], _system: ActorSy
 
   override def spawnAnonymous[U](props: Props[U]): ActorRef[U] = {
     val ref = super.spawnAnonymous(props)
-    effectQueue.offer(Spawned(ref.untypedRef.path.name))
+    effectQueue.offer(Spawned(ref.path.name))
     ref
   }
   override def spawn[U](props: Props[U], name: String): ActorRef[U] = {
     effectQueue.offer(Spawned(name))
     super.spawn(props, name)
-  }
-  override def actorOf(props: a.Props): a.ActorRef = {
-    val ref = super.actorOf(props)
-    effectQueue.offer(Spawned(ref.path.name))
-    ref
-  }
-  override def actorOf(props: a.Props, name: String): a.ActorRef = {
-    effectQueue.offer(Spawned(name))
-    super.actorOf(props, name)
   }
   override def stop(child: ActorRef[Nothing]): Boolean = {
     effectQueue.offer(Stopped(child.path.name))

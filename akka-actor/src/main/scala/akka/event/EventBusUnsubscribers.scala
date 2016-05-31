@@ -6,6 +6,7 @@ package akka.event
 import akka.actor._
 import akka.event.Logging.simpleName
 import java.util.concurrent.atomic.AtomicInteger
+import scala.concurrent.Future
 
 /**
  * INTERNAL API
@@ -65,10 +66,8 @@ private[akka] object EventStreamUnsubscriber {
   private def props(eventStream: EventStream, debug: Boolean) =
     Props(classOf[EventStreamUnsubscriber], eventStream, debug)
 
-  def start(system: ActorSystem, stream: EventStream) = {
-    val debug = system.settings.config.getBoolean("akka.actor.debug.event-stream")
-    system.asInstanceOf[ExtendedActorSystem]
-      .systemActorOf(props(stream, debug), "eventStreamUnsubscriber-" + unsubscribersCount.incrementAndGet())
+  def start(systemActorOf: (Props, String) => Unit, stream: EventStream): Unit = {
+    systemActorOf(props(stream, stream.debug), "eventStreamUnsubscriber-" + unsubscribersCount.incrementAndGet())
   }
 
 }
@@ -139,4 +138,3 @@ private[akka] object ActorClassificationUnsubscriber {
   private def props(eventBus: ManagedActorClassification, debug: Boolean) = Props(classOf[ActorClassificationUnsubscriber], eventBus, debug)
 
 }
-
